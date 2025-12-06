@@ -2,7 +2,11 @@ import { JobsListResponse, Job } from "@/types/jobs";
 
 function getBaseUrl() {
     if (typeof window !== "undefined") return ""; // Browser should use relative url
+
+    // Check for standard APP_URL (often used in generic hosting) or VERCEL_URL fallback
+    if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
     if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+
     return "http://localhost:3000"; // Localhost fallback
 }
 
