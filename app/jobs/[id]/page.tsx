@@ -1,4 +1,4 @@
-import { fetchJobById } from "@/lib/apiClient";
+import { getJobsData } from "@/lib/jobsCache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -17,7 +17,12 @@ export default async function JobDetailsPage({ params }: Props) {
 
     let job;
     try {
-        job = await fetchJobById(jobId);
+        const jobsData = await getJobsData();
+        job = jobsData.jobs.find((j) => j.id === jobId);
+
+        if (!job) {
+            notFound();
+        }
     } catch (error) {
         console.error(error);
         notFound();
