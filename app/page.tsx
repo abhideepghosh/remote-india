@@ -1,65 +1,183 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useRef, useState, useCallback } from "react";
+import { fetchJobs, searchJobs } from "@/lib/apiClient";
+import { Job } from "@/types/jobs";
+import { JobCard } from "@/components/JobCard";
+import { SearchBar } from "@/components/SearchBar";
 
 export default function Home() {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Search-related
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchHasMore, setSearchHasMore] = useState(false);
+  const [mode, setMode] = useState<"list" | "search">("list");
+
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+
+  // Initial load
+  useEffect(() => {
+    fetchJobs(1)
+      .then((res) => {
+        setJobs(res.jobs);
+        setHasMore(res.hasMore);
+      })
+      .catch(() => setError("Failed to fetch jobs"))
+      .finally(() => setIsInitialLoading(false));
+  }, []);
+
+  // Search debouncing
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (searchQuery.trim() === "") {
+        if (mode === "search") {
+          setMode("list");
+          // Optionally reset list or just keep showing loaded jobs.
+          // Ideally re-fetch or use cached initial jobs.
+          // For simplicity, we re-fetch page 1 if coming back from search to ensure freshness
+          // or we could store list state separately.
+          setIsInitialLoading(true);
+          fetchJobs(1)
+            .then((res) => {
+              setJobs(res.jobs);
+              setHasMore(res.hasMore);
+              setPage(1);
+            })
+            .catch(() => setError("Failed to fetch jobs"))
+            .finally(() => setIsInitialLoading(false));
+        }
+        return;
+      }
+
+      setMode("search");
+      setIsSearching(true);
+      setSearchPage(1);
+
+      searchJobs(searchQuery, 1)
+        .then((res) => {
+          setJobs(res.jobs);
+          setSearchHasMore(res.hasMore);
+        })
+        .catch(() => setError("Failed to search jobs"))
+        .finally(() => setIsSearching(false));
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [searchQuery]); // Removed 'mode' from deps to avoid loop, but need to be careful
+
+  const loadMoreJobs = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const nextPage = page + 1;
+      const res = await fetchJobs(nextPage);
+      setJobs((prev) => [...prev, ...res.jobs]);
+      setPage(nextPage);
+      setHasMore(res.hasMore);
+    } catch {
+      setError("Failed to load more jobs");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page]);
+
+  const loadMoreSearchResults = useCallback(async () => {
+    try {
+      setIsSearching(true); // Reuse loading state or separate? search has its own logic
+      // Actually we should use a separate loading state or reuse isLoading for scroll
+      // but let's just reuse isLoading for the bottom spinner
+      const nextPage = searchPage + 1;
+      const res = await searchJobs(searchQuery, nextPage);
+      setJobs((prev) => [...prev, ...res.jobs]);
+      setSearchPage(nextPage);
+      setSearchHasMore(res.hasMore);
+    } catch {
+      setError("Failed to load more results");
+    } finally {
+      setIsSearching(false);
+    }
+  }, [searchPage, searchQuery]);
+
+  useEffect(() => {
+    const el = bottomRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (!first.isIntersecting) return;
+
+        if (mode === "list" && hasMore && !isLoading && !isInitialLoading) {
+          loadMoreJobs();
+        } else if (mode === "search" && searchHasMore && !isSearching) {
+          loadMoreSearchResults();
+        }
+      },
+      { threshold: 0.1 } // small threshold
+    );
+
+    observer.observe(el);
+
+    return () => observer.disconnect();
+  }, [mode, hasMore, isLoading, searchHasMore, isSearching, isInitialLoading, loadMoreJobs, loadMoreSearchResults]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div className="space-y-6">
+      <SearchBar
+        value={searchQuery}
+        onChange={setSearchQuery}
+        isLoading={isSearching && mode === "search" && searchPage === 1}
+      />
+
+      {error && (
+        <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-4 text-red-200">
+          {error}
+          <button
+            onClick={() => setError(null)}
+            className="ml-2 text-sm underline hover:text-red-100"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {isInitialLoading ? (
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div
+              key={i}
+              className="h-40 w-full animate-pulse rounded-xl bg-slate-900"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          ))}
         </div>
-      </main>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {jobs.map((job) => (
+            <JobCard key={job.id} job={job} />
+          ))}
+
+          {jobs.length === 0 && !isSearching && !isLoading && (
+            <div className="text-center py-10 text-slate-400">
+              No jobs found.
+            </div>
+          )}
+
+          <div ref={bottomRef} className="h-10 w-full">
+            {(isLoading || (isSearching && searchPage > 1)) && (
+              <div className="flex justify-center py-4">
+                <span className="text-sm text-slate-400 animate-pulse">Loading more jobs...</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
