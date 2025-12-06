@@ -1,11 +1,39 @@
 import { getJobsData } from "@/lib/jobsCache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft, Building2, Users, Briefcase, Globe, Calendar, ArrowUpRight, CheckCircle2 } from "lucide-react";
 
 // Next.js 15+ params are awaitable
 type Props = {
     params: Promise<{ id: string }>;
 };
+
+import { Metadata } from "next";
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+    const { id } = await params;
+    const jobId = Number(id);
+    const jobsData = await getJobsData();
+    const job = jobsData.jobs.find((j) => j.id === jobId);
+
+    if (!job) {
+        return {
+            title: "Job Not Found",
+        };
+    }
+
+    return {
+        title: job.title,
+        description: `Apply for ${job.title} at ${job.company.name}. ${job.employmentTypes.join(", ")} job.`,
+        openGraph: {
+            title: `${job.title} at ${job.company.name}`,
+            description: `Apply for ${job.title} at ${job.company.name}. Remote job opportunity.`,
+            type: "article",
+            publishedTime: job.createdAt,
+            authors: [job.company.name],
+        },
+    };
+}
 
 export default async function JobDetailsPage({ params }: Props) {
     const { id } = await params;
@@ -28,58 +56,90 @@ export default async function JobDetailsPage({ params }: Props) {
         notFound();
     }
 
+    if (!job) return null; // Should be handled by notFound() above, but for TS safety
+
+    const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "JobPosting",
+        title: job.title,
+        description: job.description || `Job opportunity for ${job.title} at ${job.company.name}`,
+        identifier: {
+            "@type": "PropertyValue",
+            name: job.company.name,
+            value: job.id,
+        },
+        datePosted: job.createdAt,
+        validThrough: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString(), // Estimate 1 month validity
+        employmentType: job.employmentTypes.map(t => t.toUpperCase().replace("-", "_")),
+        hiringOrganization: {
+            "@type": "Organization",
+            name: job.company.name,
+            // sameAs and logo are not available in the current API response
+        },
+        jobLocation: {
+            "@type": "Place",
+            address: {
+                "@type": "PostalAddress",
+                addressCountry: "IN", // Assuming remote jobs targetable to Indians or global
+            },
+        },
+        jobLocationType: "TELECOMMUTE",
+        // Salary not available in API response
+    };
+
     return (
-        <div className="mx-auto max-w-4xl space-y-6">
+        <div className="mx-auto max-w-4xl space-y-8 pb-12">
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+            />
             <Link
                 href="/"
-                className="inline-flex items-center text-sm font-medium text-slate-400 hover:text-sky-400"
+                className="group inline-flex items-center text-sm font-medium text-slate-400 hover:text-indigo-400 transition-colors"
             >
-                <svg
-                    className="mr-2 h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                    />
-                </svg>
+                <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
                 Back to jobs
             </Link>
 
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 md:p-8 shadow-sm">
-                <div className="flex flex-col gap-4">
+            <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-2xl backdrop-blur-sm">
+                {/* Background Decoration */}
+                <div className="absolute top-0 right-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl" />
+                <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl" />
+
+                <div className="relative flex flex-col gap-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-white md:text-3xl">
+                        <h1 className="text-3xl font-bold text-white md:text-4xl leading-tight">
                             {job.title}
                         </h1>
-                        <div className="mt-2 text-sm text-slate-400">
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <span className="font-semibold text-slate-200">
-                                    {job.company.name}
-                                </span>
-                                {job.company.linkedinSize && (
-                                    <>
-                                        <span>·</span>
-                                        <span>{job.company.linkedinSize} employees</span>
-                                    </>
-                                )}
-                                {job.employmentTypes.length > 0 && (
-                                    <>
-                                        <span>·</span>
-                                        <span>{job.employmentTypes.join(" / ")}</span>
-                                    </>
-                                )}
-                                {job.countries.length > 0 && (
-                                    <>
-                                        <span>·</span>
-                                        <span>{job.countries.join(", ")}</span>
-                                    </>
-                                )}
-                                <span>·</span>
+                        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-400">
+                            <div className="flex items-center gap-2">
+                                <Building2 className="h-4 w-4 text-indigo-400" />
+                                <span className="font-semibold text-slate-200">{job.company.name}</span>
+                            </div>
+
+                            {job.company.linkedinSize && (
+                                <div className="flex items-center gap-2">
+                                    <Users className="h-4 w-4 text-slate-500" />
+                                    <span>{job.company.linkedinSize} employees</span>
+                                </div>
+                            )}
+
+                            {job.employmentTypes.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <Briefcase className="h-4 w-4 text-slate-500" />
+                                    <span>{job.employmentTypes.join(" / ")}</span>
+                                </div>
+                            )}
+
+                            {job.countries.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <Globe className="h-4 w-4 text-slate-500" />
+                                    <span>{job.countries.join(", ")}</span>
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-slate-500" />
                                 <time dateTime={job.createdAt}>
                                     Posted {new Date(job.createdAt).toLocaleDateString(undefined, {
                                         year: 'numeric',
@@ -88,9 +148,6 @@ export default async function JobDetailsPage({ params }: Props) {
                                     })}
                                 </time>
                             </div>
-                            <div className="mt-1 text-xs text-slate-500">
-                                Job ID: {job.id}
-                            </div>
                         </div>
                     </div>
 
@@ -98,32 +155,33 @@ export default async function JobDetailsPage({ params }: Props) {
                         {job.skills.map((skill) => (
                             <span
                                 key={skill}
-                                className="inline-flex items-center rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-sky-400"
+                                className="inline-flex items-center rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-300"
                             >
                                 {skill}
                             </span>
                         ))}
                     </div>
 
-                    <div className="mt-4 border-t border-slate-800 pt-6">
-                        <h2 className="mb-4 text-lg font-semibold text-white">
+                    <div className="mt-6 border-t border-slate-800/50 pt-8">
+                        <h2 className="mb-6 text-xl font-bold text-white flex items-center gap-2">
+                            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
                             Job Description
                         </h2>
-                        <div className="prose prose-invert max-w-none text-slate-300">
-                            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-6 text-center mb-6">
-                                <p className="mb-4 text-slate-300">
-                                    The full description for this role is available on the company&apos;s
-                                    application page.
+
+                        <div className="prose prose-invert max-w-none text-slate-300 leading-relaxed">
+                            <div className="rounded-xl border border-indigo-500/20 bg-indigo-950/20 p-6 text-center mb-8">
+                                <p className="mb-3 text-slate-200 font-medium">
+                                    Ready to take the next step?
                                 </p>
                                 <p className="text-sm text-slate-400">
-                                    Click the <span className="font-semibold text-sky-400">&quot;Apply for this role&quot;</span> button below to view all details and submit your application.
+                                    The full description and application details are available on the company's official page.
                                 </p>
                             </div>
 
                             {job.description && (
-                                <div className="mt-6 space-y-4">
+                                <div className="space-y-4">
                                     {job.description.split("\n").map((para, i) => (
-                                        <p key={i} className="leading-relaxed">
+                                        <p key={i} className="text-base/7 text-slate-300">
                                             {para}
                                         </p>
                                     ))}
@@ -132,14 +190,15 @@ export default async function JobDetailsPage({ params }: Props) {
                         </div>
                     </div>
 
-                    <div className="mt-8 flex items-center justify-end border-t border-slate-800 pt-6">
+                    <div className="mt-8 flex items-center justify-end border-t border-slate-800/50 pt-6">
                         <a
                             href={job.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center rounded-lg border border-sky-500 bg-sky-500 px-6 py-2.5 text-sm font-semibold text-slate-950 hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-950"
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:bg-indigo-500 hover:-translate-y-0.5"
                         >
                             Apply for this role
+                            <ArrowUpRight className="h-4 w-4" />
                         </a>
                     </div>
                 </div>

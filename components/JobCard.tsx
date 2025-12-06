@@ -2,12 +2,15 @@
 
 import { Job } from "@/types/jobs";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+import { MapPin, Briefcase, Calendar, Star, Building2, ArrowUpRight } from "lucide-react";
 
 interface JobCardProps {
     job: Job;
+    index?: number;
 }
 
-export function JobCard({ job }: JobCardProps) {
+export function JobCard({ job, index = 0 }: JobCardProps) {
     const router = useRouter();
 
     const handleCardClick = () => {
@@ -28,54 +31,78 @@ export function JobCard({ job }: JobCardProps) {
     };
 
     const description = job.description
-        ? truncateWords(job.description, 15)
+        ? truncateWords(job.description, 20)
         : `${job.title} at ${job.company.name}`;
 
     return (
-        <div
+        <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05 }}
             onClick={handleCardClick}
-            className="group flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-sm transition hover:border-sky-500/70 hover:shadow-lg md:p-5 cursor-pointer"
+            className="group relative flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/30 transition-all duration-300 cursor-pointer backdrop-blur-sm"
         >
-            <div className="flex flex-col gap-1">
-                <h3 className="text-lg font-semibold text-white md:text-xl">
-                    {job.title}
-                </h3>
-                <p className="text-xs text-slate-400">
-                    {job.company.name}
-                    {job.employmentTypes.length > 0 && ` · ${job.employmentTypes.join(" · ")}`}
-                    {job.countries.length > 0 && ` · ${job.countries[0]}`}
-                </p>
+            <div className="flex justify-between items-start gap-4">
+                <div className="flex flex-col gap-1.5 flex-1">
+                    <h3 className="text-xl font-bold text-slate-100 group-hover:text-indigo-400 transition-colors line-clamp-1">
+                        {job.title}
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                            <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                            <span className="font-medium text-slate-300">{job.company.name}</span>
+                        </div>
+                        {job.countries.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                                <span>{job.countries[0]}</span>
+                            </div>
+                        )}
+                        {job.employmentTypes.length > 0 && (
+                            <div className="flex items-center gap-1.5">
+                                <Briefcase className="w-3.5 h-3.5 text-slate-500" />
+                                <span>{job.employmentTypes[0]}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                {/* Optional: Company Logo Placeholder or Initials could go here */}
             </div>
 
-            <p className="text-sm text-slate-300 line-clamp-2">{description}</p>
+            <p className="text-sm text-slate-400 leading-relaxed line-clamp-2 pl-0.5">
+                {description}
+            </p>
 
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
                 {job.skills.slice(0, 5).map((skill) => (
                     <span
                         key={skill}
-                        className="inline-flex items-center rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[0.7rem] font-medium uppercase tracking-wide text-sky-400"
+                        className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 group-hover:border-indigo-500/30 transition-colors"
                     >
                         {skill}
                     </span>
                 ))}
                 {job.skills.length > 5 && (
-                    <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-800 px-2 py-0.5 text-[0.7rem] font-medium text-slate-400">
+                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
                         +{job.skills.length - 5}
                     </span>
                 )}
             </div>
 
-            <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-3">
-                <span className="text-xs text-slate-500">
-                    {new Date(job.createdAt).toLocaleDateString()}
+            <div className="flex items-center justify-between border-t border-slate-800/60 pt-4 mt-1">
+                <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {new Date(job.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
+
                 <button
                     onClick={handleApplyClick}
-                    className="inline-flex items-center justify-center rounded-lg border border-sky-500 bg-sky-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-950"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-500/20 transition-all hover:-translate-y-0.5"
                 >
-                    Apply
+                    Apply Now
+                    <ArrowUpRight className="w-3.5 h-3.5" />
                 </button>
             </div>
-        </div>
+        </motion.div>
     );
 }
